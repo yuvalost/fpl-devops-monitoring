@@ -1,0 +1,27 @@
+pg_stat_players:
+  query: "SELECT COUNT(*) AS player_count FROM players;"
+  metrics:
+    - player_count:
+        usage: "GAUGE"
+        description: "Total number of players in the players table"
+
+pg_stat_goals:
+  query: "SELECT SUM(goals_scored) AS total_goals FROM players;"
+  metrics:
+    - total_goals:
+        usage: "GAUGE"
+        description: "Total goals scored by all players"
+
+pg_stat_avg_goals:
+  query: "SELECT AVG(goals_scored) AS avg_goals FROM players;"
+  metrics:
+    - avg_goals:
+        usage: "GAUGE"
+        description: "Average goals scored per player"
+
+pg_stat_teams:
+  query: "SELECT COUNT(DISTINCT team_name) AS team_count FROM players;"
+  metrics:
+    - team_count:
+        usage: "GAUGE"
+        description: "Number of distinct teams"
