@@ -1,11 +1,12 @@
 apiVersion: 1
 
 providers:
-  - name: 'PostgreSQL Dashboard'
+  - name: Default
     orgId: 1
-    folder: ''
+    folder: "Auto"
     type: file
     disableDeletion: false
-    editable: true
+    allowUiUpdates: true
+    updateIntervalSeconds: 10
     options:
       path: /etc/grafana/provisioning/dashboards

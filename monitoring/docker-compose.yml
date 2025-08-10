@@ -12,13 +12,21 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      # Run your schema on first init:
+      - ./backend/schema.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d premier_league"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
     restart: unless-stopped
 
   postgres-exporter:
     image: prometheuscommunity/postgres-exporter
     container_name: postgres-exporter
     environment:
-      DATA_SOURCE_NAME: "postgresql://postgres:1q2w3e4r!@postgres:5432/premier_league?sslmode=disable"
+      # '!' must be URL-encoded as %21
+      DATA_SOURCE_NAME: "postgresql://postgres:1q2w3e4r%21@postgres:5432/premier_league?sslmode=disable"
     volumes:
       - ./queries.yaml:/etc/postgres-exporter/queries.yaml:ro
     command:
@@ -26,7 +34,8 @@ services:
     ports:
       - "9187:9187"
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
 
   node-exporter:
@@ -42,7 +51,7 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus:/etc/prometheus:ro
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
     depends_on:
@@ -54,7 +63,7 @@ services:
     image: grafana/grafana:latest
     container_name: grafana
     ports:
-      - "3000:3000"
+      - "3030:3000"
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
@@ -70,16 +79,19 @@ services:
   ingest-full:
     build:
       context: ./backend
+      dockerfile: Dockerfile
     container_name: ingest-full
-    command: ["python", "fpl_full_ingest.py"]
-    depends_on:
-      - postgres
+    command: ["python", "fpl_full_ingest.py", "--include-current"]
     environment:
       DB_NAME: premier_league
       DB_USER: postgres
       DB_PASSWORD: 1q2w3e4r!
       DB_HOST: postgres
-      DB_PORT: 5432
+      DB_PORT: "5432"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"  # runs once and exits
 
 volumes:
   pgdata:
