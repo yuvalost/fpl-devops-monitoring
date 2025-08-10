@@ -1,0 +1,210 @@
+{
+  "__inputs": [
+    { "name": "DS_PROMETHEUS", "label": "Prometheus", "type": "datasource", "pluginId": "prometheus", "pluginName": "Prometheus" },
+    { "name": "DS_POSTGRES", "label": "Postgres", "type": "datasource", "pluginId": "postgres", "pluginName": "PostgreSQL" }
+  ],
+  "__requires": [
+    { "type": "grafana", "id": "grafana", "name": "Grafana", "version": "10.0.0" },
+    { "type": "datasource", "id": "prometheus", "name": "Prometheus", "version": "1.0.0" },
+    { "type": "datasource", "id": "postgres", "name": "PostgreSQL", "version": "1.0.0" },
+    { "type": "panel", "id": "stat", "name": "Stat", "version": "" },
+    { "type": "panel", "id": "table", "name": "Table", "version": "" },
+    { "type": "panel", "id": "timeseries", "name": "Time series", "version": "" },
+    { "type": "panel", "id": "bargauge", "name": "Bar gauge", "version": "" },
+    { "type": "panel", "id": "barchart", "name": "Bar chart", "version": "" }
+  ],
+  "title": "FPL Insights – Football Analytics",
+  "editable": true,
+  "style": "dark",
+  "schemaVersion": 38,
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": { "refresh_intervals": ["10s","30s","1m","5m"] },
+  "tags": ["FPL","Premier League","Postgres","Prometheus"],
+  "templating": {
+    "list": [
+      {
+        "name": "season",
+        "label": "Season",
+        "type": "query",
+        "datasource": { "type": "postgres", "uid": "${DS_POSTGRES}" },
+        "query": "SELECT DISTINCT season FROM fpl_player_gameweek_stats ORDER BY season;",
+        "refresh": 2,
+        "current": { "selected": true, "text": "2023-24", "value": "2023-24" }
+      },
+      {
+        "name": "position",
+        "label": "Position",
+        "type": "query",
+        "datasource": { "type": "postgres", "uid": "${DS_POSTGRES}" },
+        "query": "SELECT DISTINCT position FROM fpl_players WHERE season='${season}' ORDER BY position;",
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "refresh": 2,
+        "current": { "selected": true, "text": ["All"], "value": ["$__all"] }
+      },
+      {
+        "name": "team",
+        "label": "Team",
+        "type": "query",
+        "datasource": { "type": "postgres", "uid": "${DS_POSTGRES}" },
+        "query": "SELECT DISTINCT COALESCE(t.name, t.short_name) AS team FROM fpl_teams t WHERE season='${season}' ORDER BY team;",
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "refresh": 2,
+        "current": { "selected": true, "text": ["All"], "value": ["$__all"] }
+      },
+      {
+        "name": "min_minutes",
+        "label": "Min Minutes",
+        "type": "textbox",
+        "query": "900",
+        "current": { "text": "900", "value": "900" }
+      },
+      {
+        "name": "topn",
+        "label": "Top N",
+        "type": "textbox",
+        "query": "15",
+        "current": { "text": "15", "value": "15" }
+      },
+      {
+        "name": "player",
+        "label": "Player",
+        "type": "query",
+        "datasource": { "type": "postgres", "uid": "${DS_POSTGRES}" },
+        "query": "SELECT DISTINCT p.web_name FROM fpl_players p WHERE p.season='${season}' ORDER BY 1;",
+        "refresh": 2,
+        "current": { "selected": false, "text": "Haaland", "value": "Haaland" }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Exporter health (Prometheus up)",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 0 },
+      "targets": [{ "refId": "A", "expr": "up", "legendFormat": "{{job}}", "range": true }],
+      "options": { "legend": { "showLegend": true }, "tooltip": { "mode": "all" } }
+    },
+    {
+      "type": "stat",
+      "title": "Total Goals (${season})",
+      "datasource": { "type": "postgres", "uid": "${DS_POSTGRES}" },
+      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 6 },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COALESCE(SUM(s.goals_scored),0) AS value\nFROM fpl_player_gameweek_stats s\nJOIN fpl_players p ON p.fpl_id=s.fpl_id AND p.season=s.season\nLEFT JOIN fpl_teams t ON t.team_id=s.team_id AND t.season=s.season\nWHERE s.season='${season}'\n  AND p.position ~ ${position:regex}\n  AND COALESCE(t.name,t.short_name) ~ ${team:regex};"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Total Assists (${season})",
+      "datasource": { "type": "postgres", "uid": "${DS_POSTGRES}" },
+      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 6 },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COALESCE(SUM(s.assists),0) AS value\nFROM fpl_player_gameweek_stats s\nJOIN fpl_players p ON p.fpl_id=s.fpl_id AND p.season=s.season\nLEFT JOIN fpl_teams t ON t.team_id=s.team_id AND t.season=s.season\nWHERE s.season='${season}'\n  AND p.position ~ ${position:regex}\n  AND COALESCE(t.name,t.short_name) ~ ${team:regex};"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Total Points (${season})",
+      "datasource": { "type": "postgres", "uid": "${DS_POSTGRES}" },
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 6 },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COALESCE(SUM(s.total_points),0) AS value\nFROM fpl_player_gameweek_stats s\nJOIN fpl_players p ON p.fpl_id=s.fpl_id AND p.season=s.season\nLEFT JOIN fpl_teams t ON t.team_id=s.team_id AND t.season=s.season\nWHERE s.season='${season}'\n  AND p.position ~ ${position:regex}\n  AND COALESCE(t.name,t.short_name) ~ ${team:regex};"
+        }
+      ]
+    },
+    {
+      "type": "barchart",
+      "title": "Top ${topn} players – points (${season})",
+      "datasource": { "type": "postgres", "uid": "${DS_POSTGRES}" },
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 10 },
+      "options": { "orientation": "horizontal", "legend": { "showLegend": false } },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT p.web_name AS player, SUM(s.total_points) AS points\nFROM fpl_player_gameweek_stats s\nJOIN fpl_players p ON p.fpl_id=s.fpl_id AND p.season=s.season\nLEFT JOIN fpl_teams t ON t.team_id=s.team_id AND t.season=s.season\nWHERE s.season='${season}'\n  AND p.position ~ ${position:regex}\n  AND COALESCE(t.name,t.short_name) ~ ${team:regex}\nGROUP BY p.fpl_id, player\nHAVING SUM(s.minutes) >= ${min_minutes}\nORDER BY points DESC\nLIMIT ${topn};"
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "title": "Per-90 efficiency – ${season}",
+      "datasource": { "type": "postgres", "uid": "${DS_POSTGRES}" },
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 10 },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  p.web_name AS player,\n  p.position,\n  COALESCE(t.name,t.short_name) AS team,\n  ROUND(CASE WHEN SUM(s.minutes)>0 THEN SUM(s.goals_scored)*90.0/SUM(s.minutes) END,2) AS g_per90,\n  ROUND(CASE WHEN SUM(s.minutes)>0 THEN SUM(s.assists)*90.0/SUM(s.minutes) END,2) AS a_per90,\n  ROUND(CASE WHEN SUM(s.minutes)>0 THEN SUM(s.total_points)*90.0/SUM(s.minutes) END,2) AS pts_per90,\n  SUM(s.minutes) AS minutes\nFROM fpl_player_gameweek_stats s\nJOIN fpl_players p ON p.fpl_id=s.fpl_id AND p.season=s.season\nLEFT JOIN fpl_teams t ON t.team_id=s.team_id AND t.season=s.season\nWHERE s.season='${season}'\n  AND p.position ~ ${position:regex}\n  AND COALESCE(t.name,t.short_name) ~ ${team:regex}\nGROUP BY p.fpl_id, player, p.position, team\nHAVING SUM(s.minutes) >= ${min_minutes}\nORDER BY pts_per90 DESC\nLIMIT ${topn};"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Team cumulative points by round (${season})",
+      "datasource": { "type": "postgres", "uid": "${DS_POSTGRES}" },
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 20 },
+      "fieldConfig": { "defaults": { "unit": "none" }, "overrides": [] },
+      "options": { "legend": { "showLegend": true }, "tooltip": { "mode": "all" } },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "WITH r AS (\n  SELECT s.round,\n         COALESCE(t.name,t.short_name) AS team,\n         SUM(s.total_points) AS points\n  FROM fpl_player_gameweek_stats s\n  LEFT JOIN fpl_teams t ON t.team_id=s.team_id AND t.season=s.season\n  WHERE s.season='${season}'\n    AND COALESCE(t.name,t.short_name) ~ ${team:regex}\n  GROUP BY s.round, team\n)\nSELECT\n  r.round AS time,\n  r.team AS metric,\n  SUM(r.points) OVER (PARTITION BY r.team ORDER BY r.round ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS value\nFROM r\nORDER BY r.round;"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Selected player – points by round (${season})",
+      "datasource": { "type": "postgres", "uid": "${DS_POSTGRES}" },
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 20 },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT s.round AS time, '${player}' AS metric, SUM(s.total_points) AS value\nFROM fpl_player_gameweek_stats s\nJOIN fpl_players p ON p.fpl_id=s.fpl_id AND p.season=s.season\nWHERE s.season='${season}' AND p.web_name='${player}'\nGROUP BY s.round\nORDER BY s.round;"
+        }
+      ],
+      "options": { "legend": { "showLegend": false }, "tooltip": { "mode": "single" } }
+    },
+    {
+      "type": "table",
+      "title": "ICT index leaders – ${season}",
+      "datasource": { "type": "postgres", "uid": "${DS_POSTGRES}" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 30 },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT p.web_name AS player,\n       p.position,\n       COALESCE(t.name,t.short_name) AS team,\n       ROUND(SUM(s.ict_index),1) AS ict_total,\n       SUM(s.total_points) AS points,\n       SUM(s.minutes) AS minutes\nFROM fpl_player_gameweek_stats s\nJOIN fpl_players p ON p.fpl_id=s.fpl_id AND p.season=s.season\nLEFT JOIN fpl_teams t ON t.team_id=s.team_id AND t.season=s.season\nWHERE s.season='${season}'\n  AND p.position ~ ${position:regex}\n  AND COALESCE(t.name,t.short_name) ~ ${team:regex}\nGROUP BY p.fpl_id, player, p.position, team\nHAVING SUM(s.minutes) >= ${min_minutes}\nORDER BY ict_total DESC\nLIMIT ${topn};"
+        }
+      ]
+    }
+  ],
+  "refresh": "30s"
+}

@@ -6,3 +6,18 @@ datasources:
     access: proxy
     url: http://prometheus:9090
     isDefault: true
+    editable: true
+
+  - name: Postgres (premier_league)
+    type: postgres
+    access: proxy
+    url: postgres:5432
+    user: postgres
+    secureJsonData:
+      password: 1q2w3e4r!
+    jsonData:
+      database: premier_league
+      sslmode: "disable"
+      postgresVersion: 1300
+      timescaledb: false
+    editable: true
